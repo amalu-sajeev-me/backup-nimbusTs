@@ -45,7 +45,9 @@ class MongoBackupProvider extends BackupProvider {
         `--out=${backupPath}`
       ]);
       
-      if (!result.success) {
+      // Instead of only checking result.success, check if directory was created
+      // mongodump may return non-zero exit code even when it successfully dumps data
+      if (!fs.existsSync(backupPath) || fs.readdirSync(backupPath).length === 0) {
         return {
           success: false,
           backupId: '',
@@ -53,6 +55,7 @@ class MongoBackupProvider extends BackupProvider {
           error: `MongoDB backup failed: ${result.stderr}`
         };
       }
+      
       console.log('Backup created at:', backupPath);
       console.log('Compressing backup...');
       // Compress backup if requested
@@ -88,6 +91,7 @@ class MongoBackupProvider extends BackupProvider {
       
       // Decode base64 encoded bucket name
       const decodedBucketName = Buffer.from(bucketName, 'base64').toString();
+      console.log(`Using S3 bucket: ${decodedBucketName}`);
       
       const s3Key = `backups/${path.basename(finalBackupPath)}`;
       const s3Params: PutObjectCommandInput = {
@@ -97,25 +101,40 @@ class MongoBackupProvider extends BackupProvider {
         ContentType: options.compress !== false ? 'application/gzip' : 'application/octet-stream'
       };
       
-      await this.storageService.save(s3Params);
-      
-      // Clean up local files
       try {
-        if (options.compress !== false) {
-          fs.rmSync(backupPath, { recursive: true, force: true });
+        console.log(`Uploading backup to S3 (size: ${backupFile.length} bytes)...`);
+        const s3Response = await this.storageService.save(s3Params);
+        console.log(`S3 upload successful: ${JSON.stringify(s3Response)}`);
+        
+        // Only clean up files after successful upload
+        try {
+          console.log('Cleaning up temporary files...');
+          if (options.compress !== false) {
+            fs.rmSync(backupPath, { recursive: true, force: true });
+          }
+          fs.rmSync(finalBackupPath, { force: true });
+          console.log('Temporary files cleaned up successfully');
+        } catch (cleanupError) {
+          console.warn('Warning: Failed to clean up temporary files', cleanupError);
         }
-        fs.rmSync(finalBackupPath, { force: true });
-      } catch (cleanupError) {
-        console.warn('Warning: Failed to clean up temporary files', cleanupError);
+        
+        return {
+          success: true,
+          backupId: s3Key,
+          timestamp,
+          size: backupFile.length,
+          location: `s3://${decodedBucketName}/${s3Key}`
+        };
+      } catch (s3Error) {
+        console.error('Error uploading to S3:', s3Error);
+        // Return partial success - backup was created but not uploaded
+        return {
+          success: false,
+          backupId: '',
+          timestamp,
+          error: `MongoDB backup was successful but S3 upload failed: ${s3Error instanceof Error ? s3Error.message : String(s3Error)}`
+        };
       }
-      
-      return {
-        success: true,
-        backupId: s3Key,
-        timestamp,
-        size: backupFile.length,
-        location: `s3://${decodedBucketName}/${s3Key}`
-      };
     } catch (error) {
       console.error('Error during backup:', error);
       return {
