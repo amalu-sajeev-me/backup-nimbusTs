@@ -6,6 +6,9 @@ const configSchema = z.object({
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     AWS_REGION: z.string().optional().default('us-east-1'),
     LOG_LEVEL: z.enum(['DEBUG', 'INFO', 'WARN', 'ERROR']).optional().default('INFO'),
+    NOTIFICATION_SENDER_EMAIL: z.string().base64().optional(),
+    NOTIFICATION_RECIPIENTS: z.string().base64().optional(),
+    NOTIFICATIONS_ENABLED: z.enum(['true', 'false']).optional().default('false'),
 });
 
 export { configSchema };

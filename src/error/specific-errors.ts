@@ -36,3 +36,9 @@ export class NotFoundError extends ApplicationError {
     super(message, StatusCodes.NOT_FOUND, 'NOT_FOUND', details);
   }
 }
+
+export class NotificationError extends ApplicationError {
+  constructor(message: string, details?: ErrorDetails) {
+    super(message, StatusCodes.INTERNAL_SERVER_ERROR, 'NOTIFICATION_ERROR', details);
+  }
+}
