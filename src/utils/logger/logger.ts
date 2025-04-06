@@ -1,4 +1,4 @@
-import { singleton, inject } from 'tsyringe';
+import { singleton, inject, delay } from 'tsyringe';
 import { ConfigService } from '../../config/config.service';
 import { configSchema } from '../../config/config.schema';
 import { z } from 'zod';
@@ -20,33 +20,43 @@ export interface LogEntry {
 
 @singleton()
 export class Logger {
-  private readonly logLevel: LogLevel;
+  private logLevel?: LogLevel;
 
   constructor(
-    @inject(ConfigService) private readonly configService: ConfigService<z.infer<typeof configSchema>>
-  ) {
-    this.logLevel = this.getLogLevelFromEnvironment();
+    @inject(delay(() => ConfigService)) private readonly configServiceFactory: () => ConfigService<z.infer<typeof configSchema>>
+  ) {}
+
+  private ensureInitialized(): void {
+    if (this.logLevel === undefined) {
+      this.logLevel = this.getLogLevelFromEnvironment();
+    }
   }
 
   private getLogLevelFromEnvironment(): LogLevel {
-    const nodeEnv = this.configService.get('NODE_ENV');
-    const logLevelString = this.configService.get('LOG_LEVEL');
+    try {
+      const configService = this.configServiceFactory();
+      const nodeEnv = configService.get('NODE_ENV');
+      const logLevelString = configService.get('LOG_LEVEL');
 
-    if (logLevelString) {
-      const level = logLevelString.toUpperCase();
-      if (level in LogLevel) {
-        return LogLevel[level as keyof typeof LogLevel];
+      if (logLevelString) {
+        const level = logLevelString.toUpperCase();
+        if (level in LogLevel) {
+          return LogLevel[level as keyof typeof LogLevel];
+        }
       }
-    }
 
-    // Default log levels based on environment
-    if (nodeEnv === 'production') {
-      return LogLevel.INFO;
-    } else if (nodeEnv === 'test') {
-      return LogLevel.ERROR;
+      // Default log levels based on environment
+      if (nodeEnv === 'production') {
+        return LogLevel.INFO;
+      } else if (nodeEnv === 'test') {
+        return LogLevel.ERROR;
+      }
+      
+      return LogLevel.DEBUG; // Development default
+    } catch (error) {
+      console.warn('Error initializing logger, defaulting to INFO level:', error);
+      return LogLevel.INFO; // Fallback if config service fails
     }
-    
-    return LogLevel.DEBUG; // Development default
   }
 
   private formatLog(level: string, message: string, context?: string, data?: Record<string, unknown>): LogEntry {
@@ -60,7 +70,8 @@ export class Logger {
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return level >= this.logLevel;
+    this.ensureInitialized();
+    return this.logLevel !== undefined && level >= this.logLevel;
   }
 
   private logToConsole(entry: LogEntry): void {
