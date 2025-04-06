@@ -1,0 +1,12 @@
+# Ignore artifacts:
+build
+coverage
+dist
+node_modules
+lib
+# Ignore all test files
+__tests__
+__mocks__
+# Ignore all test files
+*.test.*
+*.spec.*

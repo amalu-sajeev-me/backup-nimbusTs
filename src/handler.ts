@@ -1,7 +1,11 @@
-import { APIGatewayProxyEventV2, APIGatewayProxyResult, Context, LambdaFunctionURLHandler } from 'aws-lambda';
+import { APIGatewayProxyEventV2, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { StatusCodes } from 'http-status-codes';
 
-const handler= async (event?: APIGatewayProxyEventV2, _context?: Context, _callback?: CallableFunction): Promise<APIGatewayProxyResult> => {
+const handler = async (
+  event?: APIGatewayProxyEventV2,
+  _context?: Context,
+  _callback?: CallableFunction,
+): Promise<APIGatewayProxyResult> => {
   try {
     return {
       statusCode: StatusCodes.OK,
@@ -20,6 +24,5 @@ const handler= async (event?: APIGatewayProxyEventV2, _context?: Context, _callb
     };
   }
 };
-
 
 export { handler };
