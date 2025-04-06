@@ -4,6 +4,7 @@ import { S3Client, PutObjectCommand, PutObjectCommandOutput, DeleteObjectCommand
 import { ConfigService } from "../../config/config.service";
 import { configSchema } from "../../config/config.schema";
 import { z } from "zod";
+import { StorageError } from "../../error";
 
 @singleton()
 class S3StorageService extends StorageProvider {
@@ -23,6 +24,7 @@ class S3StorageService extends StorageProvider {
         });
     }
     
+    // Update the save method with proper error handling:
     async save<TInput = PutObjectCommandInput, TResult = PutObjectCommandOutput>(data: TInput): Promise<TResult> {
         try {
             console.log(`Uploading to S3 bucket: ${(data as PutObjectCommandInput).Bucket}, key: ${(data as PutObjectCommandInput).Key}`);
@@ -36,7 +38,13 @@ class S3StorageService extends StorageProvider {
             if (error instanceof Error) {
                 console.error(`Error name: ${error.name}, message: ${error.message}, stack: ${error.stack}`);
             }
-            throw new Error(`Failed to save data to S3: ${error instanceof Error ? error.message : String(error)}`);
+            throw new StorageError(`Failed to save data to S3: ${error instanceof Error ? error.message : String(error)}`, {
+                details: {
+                    bucket: (data as PutObjectCommandInput).Bucket,
+                    key: (data as PutObjectCommandInput).Key
+                },
+                cause: error
+            });
         }
     }
     

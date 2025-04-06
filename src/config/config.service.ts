@@ -2,6 +2,7 @@ import { singleton } from 'tsyringe';
 import { configSchema } from './config.schema';
 import { ConfigProvider } from './providers/config.provider';
 import { z } from 'zod';
+import { ApplicationError, ConfigurationError, ValidationError } from '../error';
 
 @singleton()
 class ConfigService<T extends object = z.infer<typeof configSchema>> extends ConfigProvider<T> {
@@ -15,11 +16,16 @@ class ConfigService<T extends object = z.infer<typeof configSchema>> extends Con
     try {
       const { success, data, error } = configSchema.safeParse(process.env);
       if (!success) {
-        throw new Error(`Configuration validation failed: ${error}`);
+        throw new ValidationError(`Configuration validation failed: ${error}`, {
+          details: { zodError: error }
+        });
       }
       if (data) this.config = data as T;
     } catch (error) {
-      console.error('Error validating configuration:', error);
+      if (error instanceof ApplicationError) {
+        throw error;
+      }
+      throw new ConfigurationError('Failed to validate configuration', { cause: error });
     }
   }
 
