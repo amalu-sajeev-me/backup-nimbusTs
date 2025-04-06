@@ -1,12 +1,15 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { APIGatewayProxyResult } from 'aws-lambda';
 import { StatusCodes } from 'http-status-codes';
 import { ApplicationError } from './application-error';
+import { Logger } from '../utils/logger/logger';
 
 @singleton()
 export class ErrorHandler {
+  constructor(@inject(Logger) private readonly logger: Logger) {}
+
   handleError(error: Error | ApplicationError | unknown): APIGatewayProxyResult {
-    console.error('Error caught by error handler:', error);
+    this.logger.error('Error caught by central handler', 'ErrorHandler', error);
     
     // If it's our custom application error
     if (error instanceof ApplicationError) {
@@ -28,7 +31,7 @@ export class ErrorHandler {
         { cause: error }
       );
       
-      console.error('Original error stack:', error.stack);
+      this.logger.error('Original error stack', 'ErrorHandler', undefined, { stack: error.stack });
       
       return {
         statusCode: appError.statusCode,

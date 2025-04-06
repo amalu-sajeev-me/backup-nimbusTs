@@ -5,16 +5,20 @@ import { ConfigService } from "../../config/config.service";
 import { configSchema } from "../../config/config.schema";
 import { z } from "zod";
 import { StorageError } from "../../error";
+import { Logger } from "../../utils/logger/logger";
 
 @singleton()
 class S3StorageService extends StorageProvider {
     private readonly S3: S3Client; 
     
-    constructor(@inject(ConfigService) private readonly configService: ConfigService<z.infer<typeof configSchema>>) {
+    constructor(
+        @inject(ConfigService) private readonly configService: ConfigService<z.infer<typeof configSchema>>,
+        @inject(Logger) private readonly logger: Logger
+    ) {
         super();
         // Explicitly configure region - use environment AWS_REGION if available or default to us-east-1
         const region = process.env.AWS_REGION ?? 'us-east-1';
-        console.log(`Initializing S3 client with region: ${region}`);
+        this.logger.info(`Initializing S3 client with region: ${region}`, 'S3StorageService');
         
         this.S3 = new S3Client({
             region,
@@ -24,20 +28,24 @@ class S3StorageService extends StorageProvider {
         });
     }
     
-    // Update the save method with proper error handling:
     async save<TInput = PutObjectCommandInput, TResult = PutObjectCommandOutput>(data: TInput): Promise<TResult> {
         try {
-            console.log(`Uploading to S3 bucket: ${(data as PutObjectCommandInput).Bucket}, key: ${(data as PutObjectCommandInput).Key}`);
+            const bucket = (data as PutObjectCommandInput).Bucket;
+            const key = (data as PutObjectCommandInput).Key;
+            
+            this.logger.info(`Uploading to S3 bucket: ${bucket}, key: ${key}`, 'S3StorageService');
             const command = new PutObjectCommand(data as PutObjectCommandInput);
             const response = await this.S3.send(command);
-            console.log(`S3 upload successful: ${JSON.stringify(response)}`);
+            this.logger.debug('S3 upload successful', 'S3StorageService', { response });
             return response as TResult;
         } catch (error) {
-            console.error("Error saving data to S3:", error);
-            // Add more detailed error logging
-            if (error instanceof Error) {
-                console.error(`Error name: ${error.name}, message: ${error.message}, stack: ${error.stack}`);
-            }
+            this.logger.error(
+                'Error saving data to S3', 
+                'S3StorageService', 
+                error,
+                { bucket: (data as PutObjectCommandInput).Bucket, key: (data as PutObjectCommandInput).Key }
+            );
+            
             throw new StorageError(`Failed to save data to S3: ${error instanceof Error ? error.message : String(error)}`, {
                 details: {
                     bucket: (data as PutObjectCommandInput).Bucket,
@@ -50,13 +58,29 @@ class S3StorageService extends StorageProvider {
     
     async delete<TInput = DeleteObjectCommandInput, TResult = DeleteObjectCommandOutput>(options: TInput): Promise<TResult> {
         try {
+            const bucket = (options as DeleteObjectCommandInput).Bucket;
+            const key = (options as DeleteObjectCommandInput).Key;
+            
+            this.logger.info(`Deleting from S3 bucket: ${bucket}, key: ${key}`, 'S3StorageService');
             const command = new DeleteObjectCommand(options as DeleteObjectCommandInput);
             const result = await this.S3.send(command);
+            this.logger.debug('S3 delete successful', 'S3StorageService', { result });
             return result as TResult;
         } catch (error) {
-            console.error("Error deleting data from S3:", error);
-            throw new Error("Failed to delete data from S3");
+            this.logger.error(
+                'Error deleting data from S3', 
+                'S3StorageService', 
+                error,
+                { bucket: (options as DeleteObjectCommandInput).Bucket, key: (options as DeleteObjectCommandInput).Key }
+            );
             
+            throw new StorageError(`Failed to delete data from S3: ${error instanceof Error ? error.message : String(error)}`, {
+                details: {
+                    bucket: (options as DeleteObjectCommandInput).Bucket,
+                    key: (options as DeleteObjectCommandInput).Key
+                },
+                cause: error
+            });
         }
     }
 }
