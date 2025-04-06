@@ -1,0 +1,46 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Development environment
+node_modules
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Build artifacts
+dist
+build
+*.tsbuildinfo
+
+# Environment configuration
+.env*
+.aws
+
+# Documentation
+README.md
+CHANGELOG.md
+docs
+
+# Testing
+test
+coverage
+*.test.ts
+*.spec.ts
+
+# Editor configurations
+.vscode
+.idea
+*.swp
+*.swo
+
+# Miscellaneous
+.DS_Store
+Thumbs.db
+.npmrc
+.yarnrc
+.dockerignore
+Dockerfile*
+docker-compose*
+LICENSE
